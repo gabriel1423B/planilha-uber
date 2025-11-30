@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Controle Uber</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100">
+    <div id="app"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        function App() {
+            const [registros, setRegistros] = useState([]);
+            const [novoRegistro, setNovoRegistro] = useState({
+                data: new Date().toISOString().split('T')[0],
+                ganhos: '', combustivel: '', manutencao: '', outros: '', obs: ''
+            });
+
+            useEffect(() => {
+                const dados = localStorage.getItem('uberRegistros');
+                if (dados) {
+                    setRegistros(JSON.parse(dados));
+                } else {
+                    setRegistros([
+                        { id: 1, data: '2025-11-25', ganhos: 280.50, combustivel: 85.00, manutencao: 0, outros: 15.00, obs: 'Exemplo' },
+                        { id: 2, data: '2025-11-26', ganhos: 320.00, combustivel: 90.00, manutencao: 0, outros: 12.00, obs: 'Exemplo' }
+                    ]);
+                }
+            }, []);
+
+            useEffect(() => {
+                if (registros.length > 0) {
+                    localStorage.setItem('uberRegistros', JSON.stringify(registros));
+                }
+            }, [registros]);
+
+            const stats = useMemo(() => {
+                const totalGanhos = registros.reduce((s, r) => s + parseFloat(r.ganhos || 0), 0);
+                const totalCombustivel = registros.reduce((s, r) => s + parseFloat(r.combustivel || 0), 0);
+                const totalManutencao = registros.reduce((s, r) => s + parseFloat(r.manutencao || 0), 0);
+                const totalOutros = registros.reduce((s, r) => s + parseFloat(r.outros || 0), 0);
+                const totalGastos = totalCombustivel + totalManutencao + totalOutros;
+                const lucroLiquido = totalGanhos - totalGastos;
+                const dias = registros.length;
+                return {
+                    totalGanhos, totalCombustivel, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
+                    mediaGanhos: dias > 0 ? totalGanhos / dias : 0,
+                    mediaLucro: dias > 0 ? lucroLiquido / dias : 0
+                };
+            }, [registros]);
+
+            const adicionar = () => {
+                if (!novoRegistro.data || !novoRegistro.ganhos) {
+                    alert('Preencha data e ganhos!');
+                    return;
+                }
+                const reg = {
+                    id: Date.now(),
+                    data: novoRegistro.data,
+                    ganhos: parseFloat(novoRegistro.ganhos) || 0,
+                    combustivel: parseFloat(novoRegistro.combustivel) || 0,
+                    manutencao: parseFloat(novoRegistro.manutencao) || 0,
+                    outros: parseFloat(novoRegistro.outros) || 0,
+                    obs: novoRegistro.obs
+                };
+                setRegistros([...registros, reg].sort((a, b) => new Date(b.data) - new Date(a.data)));
+                setNovoRegistro({ data: new Date().toISOString().split('T')[0], ganhos: '', combustivel: '', manutencao: '', outros: '', obs: '' });
+            };
+
+            const remover = (id) => {
+                if (confirm('Excluir?')) setRegistros(registros.filter(r => r.id !== id));
+            };
+
+            const exportarBackup = () => {
+                const blob = new Blob([JSON.stringify({ registros, data: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `backup_uber_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                alert('✅ Backup salvo!');
+            };
+
+            const exportarRelatorio = () => {
+                let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Controle Uber</title><style>
+                *{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial;padding:30px}
+                .header{background:linear-gradient(to right,#059669,#047857);color:#fff;padding:25px;border-radius:10px;margin-bottom:25px;text-align:center}
+                .header h1{font-size:28px}.resumo{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin:20px 0}
+                .card{border:3px solid #e5e7eb;border-radius:12px;padding:20px;background:#f9fafb}
+                .card-title{font-size:14px;color:#6b7280;font-weight:bold}.card-value{font-size:26px;font-weight:bold;color:#1f2937;margin:8px 0}
+                h2{margin:30px 0 15px;font-size:20px;color:#1f2937;border-bottom:3px solid #059669;padding-bottom:10px}
+                table{width:100%;border-collapse:collapse;margin-bottom:30px}
+                th{background:#f3f4f6;padding:15px 10px;text-align:left;font-size:13px;font-weight:bold;border:2px solid #e5e7eb}
+                td{padding:12px 10px;border:1px solid #e5e7eb;font-size:13px}
+                .text-right{text-align:right}.text-green{color:#059669;font-weight:bold}.text-red{color:#dc2626}.text-blue{color:#2563eb;font-weight:bold}
+                </style></head><body><div class="header"><h1>📊 Controle Uber</h1><p>${new Date().toLocaleString('pt-BR')}</p></div>
+                <div class="resumo">
+                <div class="card"><div class="card-title">💰 GANHOS</div><div class="card-value">R$ ${stats.totalGanhos.toFixed(2)}</div></div>
+                <div class="card"><div class="card-title">📉 GASTOS</div><div class="card-value">R$ ${stats.totalGastos.toFixed(2)}</div></div>
+                <div class="card"><div class="card-title">📈 LUCRO</div><div class="card-value">R$ ${stats.lucroLiquido.toFixed(2)}</div></div>
+                <div class="card"><div class="card-title">📅 DIAS</div><div class="card-value">${stats.dias}</div></div>
+                </div><h2>Histórico</h2><table><thead><tr><th>Data</th><th class="text-right">Ganhos</th>
+                <th class="text-right">Combustível</th><th class="text-right">Manutenção</th><th class="text-right">Outros</th>
+                <th class="text-right">Lucro</th><th>Obs</th></tr></thead><tbody>`;
+                
+                registros.forEach(r => {
+                    const lucro = r.ganhos - (r.combustivel + r.manutencao + r.outros);
+                    html += `<tr><td><strong>${new Date(r.data + 'T00:00').toLocaleDateString('pt-BR')}</strong></td>
+                    <td class="text-right text-green">R$ ${r.ganhos.toFixed(2)}</td>
+                    <td class="text-right text-red">R$ ${r.combustivel.toFixed(2)}</td>
+                    <td class="text-right text-red">R$ ${r.manutencao.toFixed(2)}</td>
+                    <td class="text-right text-red">R$ ${r.outros.toFixed(2)}</td>
+                    <td class="text-right ${lucro >= 0 ? 'text-blue' : 'text-red'}">R$ ${lucro.toFixed(2)}</td>
+                    <td>${r.obs || '-'}</td></tr>`;
+                });
+                
+                html += `</tbody></table></body></html>`;
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `relatorio_uber_${new Date().toISOString().split('T')[0]}.html`;
+                a.click();
+                URL.revokeObjectURL(url);
+                alert('✅ Relatório baixado! Abra e use Ctrl+P para salvar como PDF.');
+            };
+
+            const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+            const fmtData = (d) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
+
+            return (
+                <div className="min-h-screen p-4">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl shadow-xl p-6 mb-6 text-white">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div>
+                                    <h1 className="text-3xl font-bold mb-2">💰 Controle Uber</h1>
+                                    <p className="text-green-100 text-sm">✓ Salvamento automático</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={exportarBackup} className="bg-white text-green-700 px-4 py-2 rounded-xl font-semibold hover:bg-green-50 text-sm">
+                                        💾 Backup
+                                    </button>
+                                    <button onClick={exportarRelatorio} className="bg-white text-green-700 px-4 py-2 rounded-xl font-semibold hover:bg-green-50 text-sm">
+                                        📄 Relatório
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-green-500">
+                                <div className="text-gray-600 font-medium text-sm mb-1">Ganhos</div>
+                                <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGanhos)}</p>
+                                <p className="text-xs text-gray-500 mt-1">Média: {fmt(stats.mediaGanhos)}/dia</p>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-red-500">
+                                <div className="text-gray-600 font-medium text-sm mb-1">Gastos</div>
+                                <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGastos)}</p>
+                                <p className="text-xs text-gray-500 mt-1">Combustível: {fmt(stats.totalCombustivel)}</p>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500">
+                                <div className="text-gray-600 font-medium text-sm mb-1">Lucro</div>
+                                <p className="text-2xl font-bold text-gray-800">{fmt(stats.lucroLiquido)}</p>
+                                <p className="text-xs text-gray-500 mt-1">Média: {fmt(stats.mediaLucro)}/dia</p>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-purple-500">
+                                <div className="text-gray-600 font-medium text-sm mb-1">Dias</div>
+                                <p className="text-2xl font-bold text-gray-800">{stats.dias}</p>
+                                <p className="text-xs text-gray-500 mt-1">Trabalhados</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <h2 className="text-xl font-bold text-gray-800 mb-4">➕ Adicionar Dia</h2>
+                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+                                <input type="date" value={novoRegistro.data} onChange={(e) => setNovoRegistro({...novoRegistro, data: e.target.value})}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                <input type="number" step="0.01" placeholder="Ganhos" value={novoRegistro.ganhos}
+                                    onChange={(e) => setNovoRegistro({...novoRegistro, ganhos: e.target.value})}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                <input type="number" step="0.01" placeholder="Combustível" value={novoRegistro.combustivel}
+                                    onChange={(e) => setNovoRegistro({...novoRegistro, combustivel: e.target.value})}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                <input type="number" step="0.01" placeholder="Manutenção" value={novoRegistro.manutencao}
+                                    onChange={(e) => setNovoRegistro({...novoRegistro, manutencao: e.target.value})}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                <input type="number" step="0.01" placeholder="Outros" value={novoRegistro.outros}
+                                    onChange={(e) => setNovoRegistro({...novoRegistro, outros: e.target.value})}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                <input type="text" placeholder="Obs" value={novoRegistro.obs}
+                                    onChange={(e) => setNovoRegistro({...novoRegistro, obs: e.target.value})}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                            </div>
+                            <button onClick={adicionar}
+                                className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 w-full md:w-auto">
+                                ➕ Adicionar
+                            </button>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+                            <div className="p-4 bg-gradient-to-r from-slate-700 to-slate-800 text-white">
+                                <h2 className="text-lg font-bold">Histórico</h2>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-100">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left font-semibold">Data</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Ganhos</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Combustível</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Manutenção</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Outros</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Lucro</th>
+                                            <th className="px-3 py-2 text-left font-semibold">Obs</th>
+                                            <th className="px-3 py-2 text-center font-semibold">Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {registros.map((r) => {
+                                            const lucro = r.ganhos - (r.combustivel + r.manutencao + r.outros);
+                                            return (
+                                                <tr key={r.id} className="hover:bg-slate-50">
+                                                    <td className="px-3 py-2 font-medium">{fmtData(r.data)}</td>
+                                                    <td className="px-3 py-2 text-right text-green-600 font-semibold">{fmt(r.ganhos)}</td>
+                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.combustivel)}</td>
+                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.manutencao)}</td>
+                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.outros)}</td>
+                                                    <td className={`px-3 py-2 text-right font-bold ${lucro >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(lucro)}</td>
+                                                    <td className="px-3 py-2 text-gray-600">{r.obs}</td>
+                                                    <td className="px-3 py-2 text-center">
+                                                        <button onClick={() => remover(r.id)} className="text-red-600 hover:text-red-800 text-lg">🗑️</button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-300 rounded-xl p-4">
+                            <p className="text-sm text-gray-800">
+                                <strong>📱 Para instalar:</strong> Chrome → Menu (⋮) → "Adicionar à tela inicial". 
+                                Dados salvos automaticamente! Use <strong>"Backup"</strong> para não perder nada.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('app'));
+    </script>
+</body>
+</html>
