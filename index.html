@@ -77,7 +77,7 @@
             const [showSaveIndicator, setShowSaveIndicator] = useState(false);
             const [novoRegistro, setNovoRegistro] = useState({
                 data: new Date().toISOString().split('T')[0],
-                ganhos: '', combustivel: '', manutencao: '', outros: '', obs: ''
+                ganhos: '', Carregamento: '', manutencao: '', outros: '', obs: ''
             });
             const [novoGasto, setNovoGasto] = useState({
                 data: new Date().toISOString().split('T')[0],
@@ -92,8 +92,7 @@
                     setRegistros(dados);
                 } else {
                     setRegistros([
-                        { id: 1, data: '2025-11-25', ganhos: 280.50, combustivel: 85.00, manutencao: 0, outros: 15.00, obs: 'Exemplo' },
-                        { id: 2, data: '2025-11-26', ganhos: 320.00, combustivel: 90.00, manutencao: 0, outros: 12.00, obs: 'Exemplo' }
+                        
                     ]);
                 }
                 
@@ -124,16 +123,16 @@
 
             const stats = useMemo(() => {
                 const totalGanhos = registros.reduce((s, r) => s + parseFloat(r.ganhos || 0), 0);
-                const totalCombustivel = registros.reduce((s, r) => s + parseFloat(r.combustivel || 0), 0);
+                const totalCarregamento = registros.reduce((s, r) => s + parseFloat(r.Carregamento || 0), 0);
                 const totalManutencao = registros.reduce((s, r) => s + parseFloat(r.manutencao || 0), 0);
                 const totalOutros = registros.reduce((s, r) => s + parseFloat(r.outros || 0), 0);
-                const totalGastos = totalCombustivel + totalManutencao + totalOutros;
+                const totalGastos = totalCarregamento + totalManutencao + totalOutros;
                 const lucroLiquido = totalGanhos - totalGastos;
                 const dias = registros.length;
                 const totalGastosPessoais = gastosPessoais.reduce((s, g) => s + parseFloat(g.valor || 0), 0);
                 const saldoFinal = lucroLiquido - totalGastosPessoais;
                 return {
-                    totalGanhos, totalCombustivel, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
+                    totalGanhos, totalCarregamento, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
                     totalGastosPessoais, saldoFinal,
                     mediaGanhos: dias > 0 ? totalGanhos / dias : 0,
                     mediaLucro: dias > 0 ? lucroLiquido / dias : 0
@@ -149,13 +148,13 @@
                     id: Date.now(),
                     data: novoRegistro.data,
                     ganhos: parseFloat(novoRegistro.ganhos) || 0,
-                    combustivel: parseFloat(novoRegistro.combustivel) || 0,
+                    Carregamento: parseFloat(novoRegistro.Carregamento) || 0,
                     manutencao: parseFloat(novoRegistro.manutencao) || 0,
                     outros: parseFloat(novoRegistro.outros) || 0,
                     obs: novoRegistro.obs
                 };
                 setRegistros([...registros, reg].sort((a, b) => new Date(b.data) - new Date(a.data)));
-                setNovoRegistro({ data: new Date().toISOString().split('T')[0], ganhos: '', combustivel: '', manutencao: '', outros: '', obs: '' });
+                setNovoRegistro({ data: new Date().toISOString().split('T')[0], ganhos: '', Carregamento: '', manutencao: '', outros: '', obs: '' });
             };
 
             const remover = (id) => {
@@ -247,7 +246,7 @@
                             <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-red-500">
                                 <div className="text-gray-600 font-medium text-sm mb-1">Gastos Uber</div>
                                 <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGastos)}</p>
-                                <p className="text-xs text-gray-500 mt-1">Combustível: {fmt(stats.totalCombustivel)}</p>
+                                <p className="text-xs text-gray-500 mt-1">Combustível: {fmt(stats.totalCarregamento)}</p>
                             </div>
                             <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500">
                                 <div className="text-gray-600 font-medium text-sm mb-1">Lucro Uber</div>
@@ -271,7 +270,7 @@
                             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
                                 <input type="date" value={novoRegistro.data} onChange={(e) => setNovoRegistro({...novoRegistro, data: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                                 <input type="number" step="0.01" placeholder="Ganhos" value={novoRegistro.ganhos} onChange={(e) => setNovoRegistro({...novoRegistro, ganhos: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <input type="number" step="0.01" placeholder="Combustível" value={novoRegistro.combustivel} onChange={(e) => setNovoRegistro({...novoRegistro, combustivel: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                <input type="number" step="0.01" placeholder="Combustível" value={novoRegistro.Carregamento} onChange={(e) => setNovoRegistro({...novoRegistro, Carregamento: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                                 <input type="number" step="0.01" placeholder="Manutenção" value={novoRegistro.manutencao} onChange={(e) => setNovoRegistro({...novoRegistro, manutencao: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                                 <input type="number" step="0.01" placeholder="Outros" value={novoRegistro.outros} onChange={(e) => setNovoRegistro({...novoRegistro, outros: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                                 <input type="text" placeholder="Obs" value={novoRegistro.obs} onChange={(e) => setNovoRegistro({...novoRegistro, obs: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
@@ -299,12 +298,12 @@
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
                                         {registros.map((r) => {
-                                            const lucro = r.ganhos - (r.combustivel + r.manutencao + r.outros);
+                                            const lucro = r.ganhos - (r.Carregamento + r.manutencao + r.outros);
                                             return (
                                                 <tr key={r.id} className="hover:bg-slate-50">
                                                     <td className="px-3 py-2 font-medium">{fmtData(r.data)}</td>
                                                     <td className="px-3 py-2 text-right text-green-600 font-semibold">{fmt(r.ganhos)}</td>
-                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.combustivel)}</td>
+                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.Carregamento)}</td>
                                                     <td className="px-3 py-2 text-right text-red-600">{fmt(r.manutencao)}</td>
                                                     <td className="px-3 py-2 text-right text-red-600">{fmt(r.outros)}</td>
                                                     <td className={`px-3 py-2 text-right font-bold ${lucro >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(lucro)}</td>
@@ -379,7 +378,7 @@
 
                         <div className="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-300 rounded-xl p-4">
                             <p className="text-sm text-gray-800">
-                                <strong>💾 Sistema:</strong> LocalStorage + SessionStorage + Cookies (tripla proteção)<br/>
+                                <strong>💾 Sistema:</strong> Dev By Gabriel<br/>
                                 <strong>📱 Instalar:</strong> Chrome → Menu (⋮) → "Adicionar à tela inicial"<br/>
                                 <strong>⚠️ IMPORTANTE:</strong> Faça backup regularmente usando o botão "💾 Backup"!
                             </p>
