@@ -1,394 +1,410 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Controle Uber</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { -webkit-tap-highlight-color: transparent; }
-        .save-indicator {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #10b981;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 12px;
-            z-index: 1000;
-            animation: fadeIn 0.3s;
+import React, { useState, useEffect, useMemo } from 'react';
+
+const Storage = {
+  save(key, data) {
+    try {
+      const jsonData = JSON.stringify(data);
+      localStorage.setItem(key, jsonData);
+      return true;
+    } catch (e) {
+      console.error('Erro ao salvar:', e);
+      return false;
+    }
+  },
+  load(key) {
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Erro ao carregar:', e);
+      return null;
+    }
+  }
+};
+
+export default function App() {
+  const [registros, setRegistros] = useState([]);
+  const [gastosPessoais, setGastosPessoais] = useState([]);
+  const [showSaveIndicator, setShowSaveIndicator] = useState(false);
+  const [novoRegistro, setNovoRegistro] = useState({
+    data: new Date().toISOString().split('T')[0],
+    ganhos: '', combustivel: '', manutencao: '', outros: '', obs: ''
+  });
+  const [novoGasto, setNovoGasto] = useState({
+    data: new Date().toISOString().split('T')[0],
+    local: '', valor: '', obs: ''
+  });
+
+  useEffect(() => {
+    const dados = Storage.load('uberRegistros');
+    const dadosGastos = Storage.load('uberGastosPessoais');
+    
+    if (dados && dados.length > 0) {
+      setRegistros(dados);
+    }
+    
+    if (dadosGastos && dadosGastos.length > 0) {
+      setGastosPessoais(dadosGastos);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (registros.length > 0) {
+      const saved = Storage.save('uberRegistros', registros);
+      if (saved) {
+        setShowSaveIndicator(true);
+        setTimeout(() => setShowSaveIndicator(false), 2000);
+      }
+    }
+  }, [registros]);
+
+  useEffect(() => {
+    if (gastosPessoais.length >= 0) {
+      Storage.save('uberGastosPessoais', gastosPessoais);
+    }
+  }, [gastosPessoais]);
+
+  const stats = useMemo(() => {
+    const totalGanhos = registros.reduce((s, r) => s + parseFloat(r.ganhos || 0), 0);
+    const totalCombustivel = registros.reduce((s, r) => s + parseFloat(r.combustivel || 0), 0);
+    const totalManutencao = registros.reduce((s, r) => s + parseFloat(r.manutencao || 0), 0);
+    const totalOutros = registros.reduce((s, r) => s + parseFloat(r.outros || 0), 0);
+    const totalGastos = totalCombustivel + totalManutencao + totalOutros;
+    const lucroLiquido = totalGanhos - totalGastos;
+    const dias = registros.length;
+    const totalGastosPessoais = gastosPessoais.reduce((s, g) => s + parseFloat(g.valor || 0), 0);
+    const saldoFinal = lucroLiquido - totalGastosPessoais;
+    return {
+      totalGanhos, totalCombustivel, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
+      totalGastosPessoais, saldoFinal,
+      mediaGanhos: dias > 0 ? totalGanhos / dias : 0,
+      mediaLucro: dias > 0 ? lucroLiquido / dias : 0
+    };
+  }, [registros, gastosPessoais]);
+
+  const adicionar = () => {
+    if (!novoRegistro.data || !novoRegistro.ganhos) {
+      alert('Preencha data e ganhos!');
+      return;
+    }
+    const reg = {
+      id: Date.now(),
+      data: novoRegistro.data,
+      ganhos: parseFloat(novoRegistro.ganhos) || 0,
+      combustivel: parseFloat(novoRegistro.combustivel) || 0,
+      manutencao: parseFloat(novoRegistro.manutencao) || 0,
+      outros: parseFloat(novoRegistro.outros) || 0,
+      obs: novoRegistro.obs
+    };
+    setRegistros([...registros, reg].sort((a, b) => new Date(b.data) - new Date(a.data)));
+    setNovoRegistro({ data: new Date().toISOString().split('T')[0], ganhos: '', combustivel: '', manutencao: '', outros: '', obs: '' });
+  };
+
+  const remover = (id) => {
+    if (confirm('Excluir?')) setRegistros(registros.filter(r => r.id !== id));
+  };
+
+  const adicionarGasto = () => {
+    if (!novoGasto.data || !novoGasto.local || !novoGasto.valor) {
+      alert('Preencha data, local e valor!');
+      return;
+    }
+    const gasto = {
+      id: Date.now(),
+      data: novoGasto.data,
+      local: novoGasto.local,
+      valor: parseFloat(novoGasto.valor) || 0,
+      obs: novoGasto.obs
+    };
+    setGastosPessoais([...gastosPessoais, gasto].sort((a, b) => new Date(b.data) - new Date(a.data)));
+    setNovoGasto({ data: new Date().toISOString().split('T')[0], local: '', valor: '', obs: '' });
+  };
+
+  const removerGasto = (id) => {
+    if (confirm('Excluir gasto?')) setGastosPessoais(gastosPessoais.filter(g => g.id !== id));
+  };
+
+  const exportarBackup = () => {
+    const dados = { registros, gastosPessoais, data: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_uber_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    alert('✅ Backup salvo!');
+  };
+
+  const importarBackup = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const dados = JSON.parse(event.target.result);
+          if (dados.registros) setRegistros(dados.registros);
+          if (dados.gastosPessoais) setGastosPessoais(dados.gastosPessoais);
+          alert('✅ Backup restaurado!');
+        } catch (err) {
+          alert('❌ Arquivo inválido.');
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-slate-50 to-slate-100">
-    <div id="app"></div>
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
 
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  const fmtData = (d) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+  return (
+    <div className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100">
+      {showSaveIndicator && (
+        <div className="fixed top-5 right-5 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in">
+          ✓ Salvo!
+        </div>
+      )}
+      
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl shadow-xl p-6 mb-6 text-white">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">💰 Controle Uber</h1>
+              <p className="text-green-100 text-sm">✓ Salvamento automático ativo</p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={exportarBackup} className="bg-white text-green-700 px-4 py-2 rounded-xl font-semibold hover:bg-green-50 text-sm">💾 Backup</button>
+              <button onClick={importarBackup} className="bg-white text-green-700 px-4 py-2 rounded-xl font-semibold hover:bg-green-50 text-sm">📥 Restaurar</button>
+            </div>
+          </div>
+        </div>
 
-        const Storage = {
-            save(key, data) {
-                try {
-                    const jsonData = JSON.stringify(data);
-                    localStorage.setItem(key, jsonData);
-                    sessionStorage.setItem(key, jsonData);
-                    document.cookie = `${key}=${encodeURIComponent(jsonData)};max-age=31536000;path=/`;
-                    return true;
-                } catch (e) {
-                    console.error('Erro ao salvar:', e);
-                    return false;
-                }
-            },
-            load(key) {
-                try {
-                    let data = localStorage.getItem(key);
-                    if (data) return JSON.parse(data);
-                    data = sessionStorage.getItem(key);
-                    if (data) return JSON.parse(data);
-                    const cookies = document.cookie.split(';');
-                    for (let cookie of cookies) {
-                        const [name, value] = cookie.trim().split('=');
-                        if (name === key && value) {
-                            return JSON.parse(decodeURIComponent(value));
-                        }
-                    }
-                    return null;
-                } catch (e) {
-                    console.error('Erro ao carregar:', e);
-                    return null;
-                }
-            }
-        };
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-green-500">
+            <div className="text-gray-600 font-medium text-sm mb-1">Ganhos</div>
+            <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGanhos)}</p>
+            <p className="text-xs text-gray-500 mt-1">Média: {fmt(stats.mediaGanhos)}/dia</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-red-500">
+            <div className="text-gray-600 font-medium text-sm mb-1">Gastos Uber</div>
+            <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGastos)}</p>
+            <p className="text-xs text-gray-500 mt-1">Combustível: {fmt(stats.totalCombustivel)}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500">
+            <div className="text-gray-600 font-medium text-sm mb-1">Lucro Uber</div>
+            <p className="text-2xl font-bold text-gray-800">{fmt(stats.lucroLiquido)}</p>
+            <p className="text-xs text-gray-500 mt-1">Média: {fmt(stats.mediaLucro)}/dia</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-orange-500">
+            <div className="text-gray-600 font-medium text-sm mb-1">Gastos Pessoais</div>
+            <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGastosPessoais)}</p>
+            <p className="text-xs text-gray-500 mt-1">Total gasto</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-purple-500">
+            <div className="text-gray-600 font-medium text-sm mb-1">Saldo Final</div>
+            <p className={`text-2xl font-bold ${stats.saldoFinal >= 0 ? 'text-green-600' : 'text-red-600'}`}>{fmt(stats.saldoFinal)}</p>
+            <p className="text-xs text-gray-500 mt-1">{stats.dias} dias</p>
+          </div>
+        </div>
 
-        function App() {
-            const [registros, setRegistros] = useState([]);
-            const [gastosPessoais, setGastosPessoais] = useState([]);
-            const [showSaveIndicator, setShowSaveIndicator] = useState(false);
-            const [novoRegistro, setNovoRegistro] = useState({
-                data: new Date().toISOString().split('T')[0],
-                ganhos: '', Carregamento: '', manutencao: '', outros: '', obs: ''
-            });
-            const [novoGasto, setNovoGasto] = useState({
-                data: new Date().toISOString().split('T')[0],
-                local: '', valor: '', obs: ''
-            });
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">➕ Adicionar Dia Uber</h2>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+            <input type="date" value={novoRegistro.data} onChange={(e) => setNovoRegistro({...novoRegistro, data: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input type="number" step="0.01" placeholder="Ganhos" value={novoRegistro.ganhos} onChange={(e) => setNovoRegistro({...novoRegistro, ganhos: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input type="number" step="0.01" placeholder="Combustível" value={novoRegistro.combustivel} onChange={(e) => setNovoRegistro({...novoRegistro, combustivel: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input type="number" step="0.01" placeholder="Manutenção" value={novoRegistro.manutencao} onChange={(e) => setNovoRegistro({...novoRegistro, manutencao: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input type="number" step="0.01" placeholder="Outros" value={novoRegistro.outros} onChange={(e) => setNovoRegistro({...novoRegistro, outros: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input type="text" placeholder="Obs" value={novoRegistro.obs} onChange={(e) => setNovoRegistro({...novoRegistro, obs: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          </div>
+          <button onClick={adicionar} className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 w-full md:w-auto">➕ Adicionar</button>
+        </div>
 
-            useEffect(() => {
-                const dados = Storage.load('uberRegistros');
-                const dadosGastos = Storage.load('uberGastosPessoais');
-                
-                if (dados && dados.length > 0) {
-                    setRegistros(dados);
-                } else {
-                    setRegistros([
-                        
-                    ]);
-                }
-                
-                if (dadosGastos && dadosGastos.length > 0) {
-                    setGastosPessoais(dadosGastos);
-                }
-            }, []);
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+          <div className="p-4 bg-gradient-to-r from-slate-700 to-slate-800 text-white">
+            <h2 className="text-lg font-bold">Histórico Uber</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">Data</th>
+                  <th className="px-3 py-2 text-right font-semibold">Ganhos</th>
+                  <th className="px-3 py-2 text-right font-semibold">Combustível</th>
+                  <th className="px-3 py-2 text-right font-semibold">Manutenção</th>
+                  <th className="px-3 py-2 text-right font-semibold">Outros</th>
+                  <th className="px-3 py-2 text-right font-semibold">Lucro</th>
+                  <th className="px-3 py-2 text-left font-semibold">Obs</th>
+                  <th className="px-3 py-2 text-center font-semibold">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {registros.map((r) => {
+                  const lucro = r.ganhos - (r.combustivel + r.manutencao + r.outros);
+                  return (
+                    <tr key={r.id} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 font-medium">{fmtData(r.data)}</td>
+                      <td className="px-3 py-2 text-right text-green-600 font-semibold">{fmt(r.ganhos)}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{fmt(r.combustivel)}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{fmt(r.manutencao)}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{fmt(r.outros)}</td>
+                      <td className={`px-3 py-2 text-right font-bold ${lucro >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(lucro)}</td>
+                      <td className="px-3 py-2 text-gray-600">{r.obs}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button onClick={() => remover(r.id)} className="text-red-600 hover:text-red-800 text-lg">🗑️</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            useEffect(() => {
-                if (registros.length > 0) {
-                    const saved = Storage.save('uberRegistros', registros);
-                    if (saved) {
-                        setShowSaveIndicator(true);
-                        setTimeout(() => setShowSaveIndicator(false), 2000);
-                    }
-                }
-            }, [registros]);
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">🛒 Adicionar Gasto Pessoal</h2>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            <input type="date" value={novoGasto.data} onChange={(e) => setNovoGasto({...novoGasto, data: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <select value={novoGasto.local} onChange={(e) => setNovoGasto({...novoGasto, local: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+              <option value="">Selecione o local</option>
+              <option value="Supermercado">🛒 Supermercado</option>
+              <option value="Farmácia">💊 Farmácia</option>
+              <option value="Restaurante">🍽️ Restaurante</option>
+              <option value="Posto">⛽ Posto (Pessoal)</option>
+              <option value="Roupas">👕 Roupas</option>
+              <option value="Lazer">🎮 Lazer</option>
+              <option value="Contas">📄 Contas</option>
+              <option value="Outros">📦 Outros</option>
+            </select>
+            <input type="number" step="0.01" placeholder="Valor" value={novoGasto.valor} onChange={(e) => setNovoGasto({...novoGasto, valor: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input type="text" placeholder="Observação" value={novoGasto.obs} onChange={(e) => setNovoGasto({...novoGasto, obs: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-2 md:col-span-1" />
+            <button onClick={adicionarGasto} className="bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-700 col-span-2 md:col-span-1">➕ Adicionar</button>
+          </div>
+        </div>
 
-            useEffect(() => {
-                if (gastosPessoais.length >= 0) {
-                    const saved = Storage.save('uberGastosPessoais', gastosPessoais);
-                    if (saved) {
-                        setShowSaveIndicator(true);
-                        setTimeout(() => setShowSaveIndicator(false), 2000);
-                    }
-                }
-            }, [gastosPessoais]);
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+          <div className="p-4 bg-gradient-to-r from-orange-600 to-orange-700 text-white">
+            <h2 className="text-lg font-bold">💰 Gastos Pessoais</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-orange-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">Data</th>
+                  <th className="px-3 py-2 text-left font-semibold">Local</th>
+                  <th className="px-3 py-2 text-right font-semibold">Valor</th>
+                  <th className="px-3 py-2 text-left font-semibold">Obs</th>
+                  <th className="px-3 py-2 text-center font-semibold">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {gastosPessoais.length === 0 ? (
+                  <tr><td colSpan="5" className="px-3 py-8 text-center text-gray-500">Nenhum gasto pessoal registrado ainda</td></tr>
+                ) : (
+                  gastosPessoais.map((g) => (
+                    <tr key={g.id} className="hover:bg-orange-50">
+                      <td className="px-3 py-2 font-medium">{fmtData(g.data)}</td>
+                      <td className="px-3 py-2">{g.local}</td>
+                      <td className="px-3 py-2 text-right text-orange-600 font-semibold">{fmt(g.valor)}</td>
+                      <td className="px-3 py-2 text-gray-600">{g.obs || '-'}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button onClick={() => removerGasto(g.id)} className="text-red-600 hover:text-red-800 text-lg">🗑️</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            const stats = useMemo(() => {
-                const totalGanhos = registros.reduce((s, r) => s + parseFloat(r.ganhos || 0), 0);
-                const totalCarregamento = registros.reduce((s, r) => s + parseFloat(r.Carregamento || 0), 0);
-                const totalManutencao = registros.reduce((s, r) => s + parseFloat(r.manutencao || 0), 0);
-                const totalOutros = registros.reduce((s, r) => s + parseFloat(r.outros || 0), 0);
-                const totalGastos = totalCarregamento + totalManutencao + totalOutros;
-                const lucroLiquido = totalGanhos - totalGastos;
-                const dias = registros.length;
-                const totalGastosPessoais = gastosPessoais.reduce((s, g) => s + parseFloat(g.valor || 0), 0);
-                const saldoFinal = lucroLiquido - totalGastosPessoais;
-                return {
-                    totalGanhos, totalCarregamento, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
-                    totalGastosPessoais, saldoFinal,
-                    mediaGanhos: dias > 0 ? totalGanhos / dias : 0,
-                    mediaLucro: dias > 0 ? lucroLiquido / dias : 0
-                };
-            }, [registros, gastosPessoais]);
+        <div className="bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 rounded-2xl shadow-xl p-6 mb-6 border-2 border-green-200">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <span className="text-3xl">💵</span> Resumo de Lucro Líquido
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition-transform">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-gray-600 font-semibold text-sm">HOJE</div>
+                <div className="text-3xl">📅</div>
+              </div>
+              <div className="text-4xl font-bold text-green-600 mb-2">
+                {fmt(registros
+                  .filter(r => r.data === new Date().toISOString().split('T')[0])
+                  .reduce((s, r) => s + (r.ganhos - r.combustivel - r.manutencao - r.outros), 0)
+                )}
+              </div>
+              <div className="text-xs text-gray-500">Lucro líquido de hoje</div>
+            </div>
 
-            const adicionar = () => {
-                if (!novoRegistro.data || !novoRegistro.ganhos) {
-                    alert('Preencha data e ganhos!');
-                    return;
-                }
-                const reg = {
-                    id: Date.now(),
-                    data: novoRegistro.data,
-                    ganhos: parseFloat(novoRegistro.ganhos) || 0,
-                    Carregamento: parseFloat(novoRegistro.Carregamento) || 0,
-                    manutencao: parseFloat(novoRegistro.manutencao) || 0,
-                    outros: parseFloat(novoRegistro.outros) || 0,
-                    obs: novoRegistro.obs
-                };
-                setRegistros([...registros, reg].sort((a, b) => new Date(b.data) - new Date(a.data)));
-                setNovoRegistro({ data: new Date().toISOString().split('T')[0], ganhos: '', Carregamento: '', manutencao: '', outros: '', obs: '' });
-            };
+            <div className="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition-transform">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-gray-600 font-semibold text-sm">ESTA SEMANA</div>
+                <div className="text-3xl">📆</div>
+              </div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">
+                {fmt(registros
+                  .filter(r => {
+                    const dataReg = new Date(r.data + 'T00:00');
+                    const hoje = new Date();
+                    const inicioSemana = new Date(hoje);
+                    inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+                    return dataReg >= inicioSemana;
+                  })
+                  .reduce((s, r) => s + (r.ganhos - r.combustivel - r.manutencao - r.outros), 0)
+                )}
+              </div>
+              <div className="text-xs text-gray-500">
+                {registros.filter(r => {
+                  const dataReg = new Date(r.data + 'T00:00');
+                  const hoje = new Date();
+                  const inicioSemana = new Date(hoje);
+                  inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+                  return dataReg >= inicioSemana;
+                }).length} dias trabalhados
+              </div>
+            </div>
 
-            const remover = (id) => {
-                if (confirm('Excluir?')) setRegistros(registros.filter(r => r.id !== id));
-            };
+            <div className="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition-transform">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-gray-600 font-semibold text-sm">ESTE MÊS</div>
+                <div className="text-3xl">📊</div>
+              </div>
+              <div className="text-4xl font-bold text-purple-600 mb-2">
+                {fmt(registros
+                  .filter(r => {
+                    const dataReg = new Date(r.data + 'T00:00');
+                    const hoje = new Date();
+                    return dataReg.getMonth() === hoje.getMonth() && 
+                           dataReg.getFullYear() === hoje.getFullYear();
+                  })
+                  .reduce((s, r) => s + (r.ganhos - r.combustivel - r.manutencao - r.outros), 0)
+                )}
+              </div>
+              <div className="text-xs text-gray-500">
+                {registros.filter(r => {
+                  const dataReg = new Date(r.data + 'T00:00');
+                  const hoje = new Date();
+                  return dataReg.getMonth() === hoje.getMonth() && 
+                         dataReg.getFullYear() === hoje.getFullYear();
+                }).length} dias trabalhados
+              </div>
+            </div>
+          </div>
+        </div>
 
-            const adicionarGasto = () => {
-                if (!novoGasto.data || !novoGasto.local || !novoGasto.valor) {
-                    alert('Preencha data, local e valor!');
-                    return;
-                }
-                const gasto = {
-                    id: Date.now(),
-                    data: novoGasto.data,
-                    local: novoGasto.local,
-                    valor: parseFloat(novoGasto.valor) || 0,
-                    obs: novoGasto.obs
-                };
-                setGastosPessoais([...gastosPessoais, gasto].sort((a, b) => new Date(b.data) - new Date(a.data)));
-                setNovoGasto({ data: new Date().toISOString().split('T')[0], local: '', valor: '', obs: '' });
-            };
-
-            const removerGasto = (id) => {
-                if (confirm('Excluir gasto?')) setGastosPessoais(gastosPessoais.filter(g => g.id !== id));
-            };
-
-            const exportarBackup = () => {
-                const dados = { registros, gastosPessoais, data: new Date().toISOString() };
-                const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `backup_uber_${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                alert('✅ Backup salvo!');
-            };
-
-            const importarBackup = () => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.json';
-                input.onchange = (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        try {
-                            const dados = JSON.parse(event.target.result);
-                            if (dados.registros) setRegistros(dados.registros);
-                            if (dados.gastosPessoais) setGastosPessoais(dados.gastosPessoais);
-                            alert('✅ Backup restaurado!');
-                        } catch (err) {
-                            alert('❌ Arquivo inválido.');
-                        }
-                    };
-                    reader.readAsText(file);
-                };
-                input.click();
-            };
-
-            const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-            const fmtData = (d) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
-
-            return (
-                <div className="min-h-screen p-4">
-                    {showSaveIndicator && <div className="save-indicator">✓ Salvo!</div>}
-                    
-                    <div className="max-w-7xl mx-auto">
-                        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl shadow-xl p-6 mb-6 text-white">
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                                <div>
-                                    <h1 className="text-3xl font-bold mb-2">💰 Controle Uber</h1>
-                                    <p className="text-green-100 text-sm">✓ Salvamento automático ativo</p>
-                                </div>
-                                <div className="flex gap-2 flex-wrap">
-                                    <button onClick={exportarBackup} className="bg-white text-green-700 px-4 py-2 rounded-xl font-semibold hover:bg-green-50 text-sm">💾 Backup</button>
-                                    <button onClick={importarBackup} className="bg-white text-green-700 px-4 py-2 rounded-xl font-semibold hover:bg-green-50 text-sm">📥 Restaurar</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-green-500">
-                                <div className="text-gray-600 font-medium text-sm mb-1">Ganhos</div>
-                                <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGanhos)}</p>
-                                <p className="text-xs text-gray-500 mt-1">Média: {fmt(stats.mediaGanhos)}/dia</p>
-                            </div>
-                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-red-500">
-                                <div className="text-gray-600 font-medium text-sm mb-1">Gastos Uber</div>
-                                <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGastos)}</p>
-                                <p className="text-xs text-gray-500 mt-1">Combustível: {fmt(stats.totalCarregamento)}</p>
-                            </div>
-                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500">
-                                <div className="text-gray-600 font-medium text-sm mb-1">Lucro Uber</div>
-                                <p className="text-2xl font-bold text-gray-800">{fmt(stats.lucroLiquido)}</p>
-                                <p className="text-xs text-gray-500 mt-1">Média: {fmt(stats.mediaLucro)}/dia</p>
-                            </div>
-                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-orange-500">
-                                <div className="text-gray-600 font-medium text-sm mb-1">Gastos Pessoais</div>
-                                <p className="text-2xl font-bold text-gray-800">{fmt(stats.totalGastosPessoais)}</p>
-                                <p className="text-xs text-gray-500 mt-1">Total gasto</p>
-                            </div>
-                            <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-purple-500">
-                                <div className="text-gray-600 font-medium text-sm mb-1">Saldo Final</div>
-                                <p className={`text-2xl font-bold ${stats.saldoFinal >= 0 ? 'text-green-600' : 'text-red-600'}`}>{fmt(stats.saldoFinal)}</p>
-                                <p className="text-xs text-gray-500 mt-1">{stats.dias} dias</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">➕ Adicionar Dia Uber</h2>
-                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
-                                <input type="date" value={novoRegistro.data} onChange={(e) => setNovoRegistro({...novoRegistro, data: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <input type="number" step="0.01" placeholder="Ganhos" value={novoRegistro.ganhos} onChange={(e) => setNovoRegistro({...novoRegistro, ganhos: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <input type="number" step="0.01" placeholder="Combustível" value={novoRegistro.Carregamento} onChange={(e) => setNovoRegistro({...novoRegistro, Carregamento: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <input type="number" step="0.01" placeholder="Manutenção" value={novoRegistro.manutencao} onChange={(e) => setNovoRegistro({...novoRegistro, manutencao: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <input type="number" step="0.01" placeholder="Outros" value={novoRegistro.outros} onChange={(e) => setNovoRegistro({...novoRegistro, outros: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <input type="text" placeholder="Obs" value={novoRegistro.obs} onChange={(e) => setNovoRegistro({...novoRegistro, obs: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                            </div>
-                            <button onClick={adicionar} className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 w-full md:w-auto">➕ Adicionar</button>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
-                            <div className="p-4 bg-gradient-to-r from-slate-700 to-slate-800 text-white">
-                                <h2 className="text-lg font-bold">Histórico Uber</h2>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-slate-100">
-                                        <tr>
-                                            <th className="px-3 py-2 text-left font-semibold">Data</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Ganhos</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Combustível</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Manutenção</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Outros</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Lucro</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Obs</th>
-                                            <th className="px-3 py-2 text-center font-semibold">Ação</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {registros.map((r) => {
-                                            const lucro = r.ganhos - (r.Carregamento + r.manutencao + r.outros);
-                                            return (
-                                                <tr key={r.id} className="hover:bg-slate-50">
-                                                    <td className="px-3 py-2 font-medium">{fmtData(r.data)}</td>
-                                                    <td className="px-3 py-2 text-right text-green-600 font-semibold">{fmt(r.ganhos)}</td>
-                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.Carregamento)}</td>
-                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.manutencao)}</td>
-                                                    <td className="px-3 py-2 text-right text-red-600">{fmt(r.outros)}</td>
-                                                    <td className={`px-3 py-2 text-right font-bold ${lucro >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(lucro)}</td>
-                                                    <td className="px-3 py-2 text-gray-600">{r.obs}</td>
-                                                    <td className="px-3 py-2 text-center">
-                                                        <button onClick={() => remover(r.id)} className="text-red-600 hover:text-red-800 text-lg">🗑️</button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">🛒 Adicionar Gasto Pessoal</h2>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-                                <input type="date" value={novoGasto.data} onChange={(e) => setNovoGasto({...novoGasto, data: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <select value={novoGasto.local} onChange={(e) => setNovoGasto({...novoGasto, local: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <option value="">Selecione o local</option>
-                                    <option value="Supermercado">🛒 Supermercado</option>
-                                    <option value="Farmácia">💊 Farmácia</option>
-                                    <option value="Restaurante">🍽️ Restaurante</option>
-                                    <option value="Posto">⛽ Posto (Pessoal)</option>
-                                    <option value="Roupas">👕 Roupas</option>
-                                    <option value="Lazer">🎮 Lazer</option>
-                                    <option value="Contas">📄 Contas</option>
-                                    <option value="Outros">📦 Outros</option>
-                                </select>
-                                <input type="number" step="0.01" placeholder="Valor" value={novoGasto.valor} onChange={(e) => setNovoGasto({...novoGasto, valor: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                                <input type="text" placeholder="Observação" value={novoGasto.obs} onChange={(e) => setNovoGasto({...novoGasto, obs: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-2 md:col-span-1" />
-                                <button onClick={adicionarGasto} className="bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-700 col-span-2 md:col-span-1">➕ Adicionar</button>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
-                            <div className="p-4 bg-gradient-to-r from-orange-600 to-orange-700 text-white">
-                                <h2 className="text-lg font-bold">💰 Gastos Pessoais</h2>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-orange-50">
-                                        <tr>
-                                            <th className="px-3 py-2 text-left font-semibold">Data</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Local</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Valor</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Obs</th>
-                                            <th className="px-3 py-2 text-center font-semibold">Ação</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {gastosPessoais.length === 0 ? (
-                                            <tr><td colSpan="5" className="px-3 py-8 text-center text-gray-500">Nenhum gasto pessoal registrado ainda</td></tr>
-                                        ) : (
-                                            gastosPessoais.map((g) => (
-                                                <tr key={g.id} className="hover:bg-orange-50">
-                                                    <td className="px-3 py-2 font-medium">{fmtData(g.data)}</td>
-                                                    <td className="px-3 py-2">{g.local}</td>
-                                                    <td className="px-3 py-2 text-right text-orange-600 font-semibold">{fmt(g.valor)}</td>
-                                                    <td className="px-3 py-2 text-gray-600">{g.obs || '-'}</td>
-                                                    <td className="px-3 py-2 text-center">
-                                                        <button onClick={() => removerGasto(g.id)} className="text-red-600 hover:text-red-800 text-lg">🗑️</button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div className="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-300 rounded-xl p-4">
-                            <p className="text-sm text-gray-800">
-                                <strong>💾 Sistema:</strong> Dev By Gabriel<br/>
-                                <strong>📱 Instalar:</strong> Chrome → Menu (⋮) → "Adicionar à tela inicial"<br/>
-                                <strong>⚠️ IMPORTANTE:</strong> Faça backup regularmente usando o botão "💾 Backup"!
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        ReactDOM.render(<App />, document.getElementById('app'));
-    </script>
-</body>
-</html>
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-300 rounded-xl p-4">
+          <p className="text-sm text-gray-800">
+            <strong>💾 Salvamento automático:</strong> Seus dados são salvos no navegador automaticamente.<br/>
+            <strong>⚠️ IMPORTANTE:</strong> Faça backup regularmente usando o botão "💾 Backup" acima!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
