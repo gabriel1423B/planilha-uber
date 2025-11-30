@@ -6,18 +6,20 @@
   <title>⚡ Controle Uber Elétrico</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; }
+    body { 
+      font-family: system-ui, -apple-system, sans-serif; 
+    }
   </style>
 </head>
 <body>
   <div id="app"></div>
 
   <script>
+    // Sistema de armazenamento local
     const Storage = {
       save(key, data) {
         try {
-          const jsonData = JSON.stringify(data);
-          localStorage.setItem(key, jsonData);
+          localStorage.setItem(key, JSON.stringify(data));
           return true;
         } catch (e) {
           console.error('Erro ao salvar:', e);
@@ -39,19 +41,29 @@
     let gastosPessoais = [];
     let novoRegistro = {
       data: new Date().toISOString().split('T')[0],
-      ganhos: '', carregamento: '', manutencao: '', outros: '', obs: ''
+      ganhos: '', 
+      carregamento: '', 
+      manutencao: '', 
+      outros: '', 
+      obs: ''
     };
     let novoGasto = {
       data: new Date().toISOString().split('T')[0],
-      local: '', valor: '', obs: ''
+      local: '', 
+      valor: '', 
+      obs: ''
     };
 
     function init() {
       const dados = Storage.load('uberRegistros');
       const dadosGastos = Storage.load('uberGastosPessoais');
       
-      if (dados && dados.length > 0) registros = dados;
-      if (dadosGastos && dadosGastos.length > 0) gastosPessoais = dadosGastos;
+      if (dados && dados.length > 0) {
+        registros = dados;
+      }
+      if (dadosGastos && dadosGastos.length > 0) {
+        gastosPessoais = dadosGastos;
+      }
       
       render();
     }
@@ -64,29 +76,54 @@
 
     function mostrarIndicador() {
       const indicador = document.getElementById('saveIndicator');
-      indicador.classList.remove('hidden');
-      setTimeout(() => indicador.classList.add('hidden'), 2000);
+      if (indicador) {
+        indicador.classList.remove('hidden');
+        setTimeout(() => indicador.classList.add('hidden'), 2000);
+      }
     }
 
-    function parseValor(val) {
-      const num = parseFloat(val);
-      return isNaN(num) ? 0 : num;
+    // Função pra converter valores de forma segura
+    function converterValor(valor) {
+      if (!valor || valor === '') return 0;
+      const numero = parseFloat(valor);
+      if (isNaN(numero)) return 0;
+      return numero;
     }
 
     function calcularStats() {
-      const totalGanhos = registros.reduce((s, r) => s + parseValor(r.ganhos), 0);
-      const totalCarregamento = registros.reduce((s, r) => s + parseValor(r.carregamento), 0);
-      const totalManutencao = registros.reduce((s, r) => s + parseValor(r.manutencao), 0);
-      const totalOutros = registros.reduce((s, r) => s + parseValor(r.outros), 0);
+      let totalGanhos = 0;
+      let totalCarregamento = 0;
+      let totalManutencao = 0;
+      let totalOutros = 0;
+
+      for (let i = 0; i < registros.length; i++) {
+        totalGanhos += converterValor(registros[i].ganhos);
+        totalCarregamento += converterValor(registros[i].carregamento);
+        totalManutencao += converterValor(registros[i].manutencao);
+        totalOutros += converterValor(registros[i].outros);
+      }
+
       const totalGastos = totalCarregamento + totalManutencao + totalOutros;
       const lucroLiquido = totalGanhos - totalGastos;
       const dias = registros.length;
-      const totalGastosPessoais = gastosPessoais.reduce((s, g) => s + parseValor(g.valor), 0);
+
+      let totalGastosPessoais = 0;
+      for (let i = 0; i < gastosPessoais.length; i++) {
+        totalGastosPessoais += converterValor(gastosPessoais[i].valor);
+      }
+
       const saldoFinal = lucroLiquido - totalGastosPessoais;
       
       return {
-        totalGanhos, totalCarregamento, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
-        totalGastosPessoais, saldoFinal,
+        totalGanhos: totalGanhos,
+        totalCarregamento: totalCarregamento,
+        totalManutencao: totalManutencao,
+        totalOutros: totalOutros,
+        totalGastos: totalGastos,
+        lucroLiquido: lucroLiquido,
+        dias: dias,
+        totalGastosPessoais: totalGastosPessoais,
+        saldoFinal: saldoFinal,
         mediaGanhos: dias > 0 ? totalGanhos / dias : 0,
         mediaLucro: dias > 0 ? lucroLiquido / dias : 0
       };
@@ -97,25 +134,40 @@
         alert('Preencha data e ganhos!');
         return;
       }
+
       const reg = {
         id: Date.now(),
         data: novoRegistro.data,
-        ganhos: parseValor(novoRegistro.ganhos),
-        carregamento: parseValor(novoRegistro.carregamento),
-        manutencao: parseValor(novoRegistro.manutencao),
-        outros: parseValor(novoRegistro.outros),
+        ganhos: converterValor(novoRegistro.ganhos),
+        carregamento: converterValor(novoRegistro.carregamento),
+        manutencao: converterValor(novoRegistro.manutencao),
+        outros: converterValor(novoRegistro.outros),
         obs: novoRegistro.obs
       };
+
       registros.push(reg);
-      registros.sort((a, b) => new Date(b.data) - new Date(a.data));
-      novoRegistro = { data: new Date().toISOString().split('T')[0], ganhos: '', carregamento: '', manutencao: '', outros: '', obs: '' };
+      registros.sort(function(a, b) {
+        return new Date(b.data) - new Date(a.data);
+      });
+
+      novoRegistro = { 
+        data: new Date().toISOString().split('T')[0], 
+        ganhos: '', 
+        carregamento: '', 
+        manutencao: '', 
+        outros: '', 
+        obs: '' 
+      };
+
       salvarDados();
       render();
     }
 
     function remover(id) {
-      if (confirm('Excluir?')) {
-        registros = registros.filter(r => r.id !== id);
+      if (confirm('Deseja realmente excluir este registro?')) {
+        registros = registros.filter(function(r) {
+          return r.id !== id;
+        });
         salvarDados();
         render();
       }
@@ -126,58 +178,76 @@
         alert('Preencha data, local e valor!');
         return;
       }
+
       const gasto = {
         id: Date.now(),
         data: novoGasto.data,
         local: novoGasto.local,
-        valor: parseValor(novoGasto.valor),
+        valor: converterValor(novoGasto.valor),
         obs: novoGasto.obs
       };
+
       gastosPessoais.push(gasto);
-      gastosPessoais.sort((a, b) => new Date(b.data) - new Date(a.data));
-      novoGasto = { data: new Date().toISOString().split('T')[0], local: '', valor: '', obs: '' };
+      gastosPessoais.sort(function(a, b) {
+        return new Date(b.data) - new Date(a.data);
+      });
+
+      novoGasto = { 
+        data: new Date().toISOString().split('T')[0], 
+        local: '', 
+        valor: '', 
+        obs: '' 
+      };
+
       salvarDados();
       render();
     }
 
     function removerGasto(id) {
-      if (confirm('Excluir gasto?')) {
-        gastosPessoais = gastosPessoais.filter(g => g.id !== id);
+      if (confirm('Deseja realmente excluir este gasto?')) {
+        gastosPessoais = gastosPessoais.filter(function(g) {
+          return g.id !== id;
+        });
         salvarDados();
         render();
       }
     }
 
     function exportarBackup() {
-      const dados = { registros, gastosPessoais, data: new Date().toISOString() };
+      const dados = { 
+        registros: registros, 
+        gastosPessoais: gastosPessoais, 
+        data: new Date().toISOString() 
+      };
       const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backup_uber_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = 'backup_uber_' + new Date().toISOString().split('T')[0] + '.json';
       a.click();
       URL.revokeObjectURL(url);
-      alert('✅ Backup salvo!');
+      alert('✅ Backup salvo com sucesso!');
     }
 
     function importarBackup() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.json';
-      input.onchange = (e) => {
+      input.onchange = function(e) {
         const file = e.target.files[0];
         if (!file) return;
+        
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = function(event) {
           try {
             const dados = JSON.parse(event.target.result);
             if (dados.registros) registros = dados.registros;
             if (dados.gastosPessoais) gastosPessoais = dados.gastosPessoais;
             salvarDados();
             render();
-            alert('✅ Backup restaurado!');
+            alert('✅ Backup restaurado com sucesso!');
           } catch (err) {
-            alert('❌ Arquivo inválido.');
+            alert('❌ Arquivo inválido. Verifique o formato.');
           }
         };
         reader.readAsText(file);
@@ -185,8 +255,16 @@
       input.click();
     }
 
-    const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-    const fmtData = (d) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
+    function formatarMoeda(valor) {
+      return new Intl.NumberFormat('pt-BR', { 
+        style: 'currency', 
+        currency: 'BRL' 
+      }).format(valor);
+    }
+
+    function formatarData(data) {
+      return new Date(data + 'T00:00').toLocaleDateString('pt-BR');
+    }
 
     function render() {
       const stats = calcularStats();
@@ -194,29 +272,82 @@
       const inicioSemana = new Date();
       inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
       
-      const lucroHoje = registros
-        .filter(r => r.data === hoje)
-        .reduce((s, r) => s + (parseValor(r.ganhos) - parseValor(r.carregamento) - parseValor(r.manutencao) - parseValor(r.outros)), 0);
+      let lucroHoje = 0;
+      for (let i = 0; i < registros.length; i++) {
+        if (registros[i].data === hoje) {
+          lucroHoje += converterValor(registros[i].ganhos) - 
+                       converterValor(registros[i].carregamento) - 
+                       converterValor(registros[i].manutencao) - 
+                       converterValor(registros[i].outros);
+        }
+      }
       
-      const lucroSemana = registros
-        .filter(r => new Date(r.data + 'T00:00') >= inicioSemana)
-        .reduce((s, r) => s + (parseValor(r.ganhos) - parseValor(r.combustivel) - parseValor(r.manutencao) - parseValor(r.outros)), 0);
+      let lucroSemana = 0;
+      let diasSemana = 0;
+      for (let i = 0; i < registros.length; i++) {
+        if (new Date(registros[i].data + 'T00:00') >= inicioSemana) {
+          lucroSemana += converterValor(registros[i].ganhos) - 
+                         converterValor(registros[i].carregamento) - 
+                         converterValor(registros[i].manutencao) - 
+                         converterValor(registros[i].outros);
+          diasSemana++;
+        }
+      }
       
-      const diasSemana = registros.filter(r => new Date(r.data + 'T00:00') >= inicioSemana).length;
-      
-      const lucroMes = registros
-        .filter(r => {
-          const d = new Date(r.data + 'T00:00');
-          const h = new Date();
-          return d.getMonth() === h.getMonth() && d.getFullYear() === h.getFullYear();
-        })
-        .reduce((s, r) => s + (parseValor(r.ganhos) - parseValor(r.combustivel) - parseValor(r.manutencao) - parseValor(r.outros)), 0);
-      
-      const diasMes = registros.filter(r => {
-        const d = new Date(r.data + 'T00:00');
-        const h = new Date();
-        return d.getMonth() === h.getMonth() && d.getFullYear() === h.getFullYear();
-      }).length;
+      let lucroMes = 0;
+      let diasMes = 0;
+      const agora = new Date();
+      for (let i = 0; i < registros.length; i++) {
+        const dataReg = new Date(registros[i].data + 'T00:00');
+        if (dataReg.getMonth() === agora.getMonth() && 
+            dataReg.getFullYear() === agora.getFullYear()) {
+          lucroMes += converterValor(registros[i].ganhos) - 
+                      converterValor(registros[i].carregamento) - 
+                      converterValor(registros[i].manutencao) - 
+                      converterValor(registros[i].outros);
+          diasMes++;
+        }
+      }
+
+      let tabelaRegistros = '';
+      if (registros.length === 0) {
+        tabelaRegistros = '<tr><td colspan="8" class="px-3 py-8 text-center text-gray-500">Nenhum registro ainda. Adicione seu primeiro dia acima!</td></tr>';
+      } else {
+        for (let i = 0; i < registros.length; i++) {
+          const r = registros[i];
+          const lucro = converterValor(r.ganhos) - 
+                       (converterValor(r.carregamento) + 
+                        converterValor(r.manutencao) + 
+                        converterValor(r.outros));
+          
+          tabelaRegistros += '<tr class="hover:bg-slate-50">';
+          tabelaRegistros += '<td class="px-3 py-2 font-medium">' + formatarData(r.data) + '</td>';
+          tabelaRegistros += '<td class="px-3 py-2 text-right text-green-600 font-semibold">' + formatarMoeda(r.ganhos) + '</td>';
+          tabelaRegistros += '<td class="px-3 py-2 text-right text-red-600">' + formatarMoeda(r.carregamento) + '</td>';
+          tabelaRegistros += '<td class="px-3 py-2 text-right text-red-600">' + formatarMoeda(r.manutencao) + '</td>';
+          tabelaRegistros += '<td class="px-3 py-2 text-right text-red-600">' + formatarMoeda(r.outros) + '</td>';
+          tabelaRegistros += '<td class="px-3 py-2 text-right font-bold ' + (lucro >= 0 ? 'text-blue-600' : 'text-red-600') + '">' + formatarMoeda(lucro) + '</td>';
+          tabelaRegistros += '<td class="px-3 py-2 text-gray-600">' + (r.obs || '-') + '</td>';
+          tabelaRegistros += '<td class="px-3 py-2 text-center"><button onclick="remover(' + r.id + ')" class="text-red-600 hover:text-red-800 text-lg">🗑️</button></td>';
+          tabelaRegistros += '</tr>';
+        }
+      }
+
+      let tabelaGastos = '';
+      if (gastosPessoais.length === 0) {
+        tabelaGastos = '<tr><td colspan="5" class="px-3 py-8 text-center text-gray-500">Nenhum gasto pessoal registrado ainda</td></tr>';
+      } else {
+        for (let i = 0; i < gastosPessoais.length; i++) {
+          const g = gastosPessoais[i];
+          tabelaGastos += '<tr class="hover:bg-orange-50">';
+          tabelaGastos += '<td class="px-3 py-2 font-medium">' + formatarData(g.data) + '</td>';
+          tabelaGastos += '<td class="px-3 py-2">' + g.local + '</td>';
+          tabelaGastos += '<td class="px-3 py-2 text-right text-orange-600 font-semibold">' + formatarMoeda(g.valor) + '</td>';
+          tabelaGastos += '<td class="px-3 py-2 text-gray-600">' + (g.obs || '-') + '</td>';
+          tabelaGastos += '<td class="px-3 py-2 text-center"><button onclick="removerGasto(' + g.id + ')" class="text-red-600 hover:text-red-800 text-lg">🗑️</button></td>';
+          tabelaGastos += '</tr>';
+        }
+      }
 
       document.getElementById('app').innerHTML = `
         <div class="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100">
@@ -245,28 +376,28 @@
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               <div class="bg-white rounded-xl shadow-lg p-4 border-l-4 border-green-500">
                 <div class="text-gray-600 font-medium text-sm mb-1">Ganhos</div>
-                <p class="text-2xl font-bold text-gray-800">${fmt(stats.totalGanhos)}</p>
-                <p class="text-xs text-gray-500 mt-1">Média: ${fmt(stats.mediaGanhos)}/dia</p>
+                <p class="text-2xl font-bold text-gray-800">${formatarMoeda(stats.totalGanhos)}</p>
+                <p class="text-xs text-gray-500 mt-1">Média: ${formatarMoeda(stats.mediaGanhos)}/dia</p>
               </div>
               <div class="bg-white rounded-xl shadow-lg p-4 border-l-4 border-red-500">
                 <div class="text-gray-600 font-medium text-sm mb-1">Gastos Uber</div>
-                <p class="text-2xl font-bold text-gray-800">${fmt(stats.totalGastos)}</p>
-                <p class="text-xs text-gray-500 mt-1">Carregamento: ${fmt(stats.totalCarregamento)}</p>
+                <p class="text-2xl font-bold text-gray-800">${formatarMoeda(stats.totalGastos)}</p>
+                <p class="text-xs text-gray-500 mt-1">Carregamento: ${formatarMoeda(stats.totalCarregamento)}</p>
               </div>
               <div class="bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500">
                 <div class="text-gray-600 font-medium text-sm mb-1">Lucro Uber</div>
-                <p class="text-2xl font-bold text-gray-800">${fmt(stats.lucroLiquido)}</p>
-                <p class="text-xs text-gray-500 mt-1">Média: ${fmt(stats.mediaLucro)}/dia</p>
+                <p class="text-2xl font-bold text-gray-800">${formatarMoeda(stats.lucroLiquido)}</p>
+                <p class="text-xs text-gray-500 mt-1">Média: ${formatarMoeda(stats.mediaLucro)}/dia</p>
               </div>
               <div class="bg-white rounded-xl shadow-lg p-4 border-l-4 border-orange-500">
                 <div class="text-gray-600 font-medium text-sm mb-1">Gastos Pessoais</div>
-                <p class="text-2xl font-bold text-gray-800">${fmt(stats.totalGastosPessoais)}</p>
+                <p class="text-2xl font-bold text-gray-800">${formatarMoeda(stats.totalGastosPessoais)}</p>
                 <p class="text-xs text-gray-500 mt-1">Total gasto</p>
               </div>
               <div class="bg-white rounded-xl shadow-lg p-4 border-l-4 border-purple-500">
                 <div class="text-gray-600 font-medium text-sm mb-1">Saldo Final</div>
                 <p class="text-2xl font-bold ${stats.saldoFinal >= 0 ? 'text-green-600' : 'text-red-600'}">
-                  ${fmt(stats.saldoFinal)}
+                  ${formatarMoeda(stats.saldoFinal)}
                 </p>
                 <p class="text-xs text-gray-500 mt-1">${stats.dias} dias</p>
               </div>
@@ -306,33 +437,7 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-200">
-                    ${registros.length === 0 ? `
-                      <tr>
-                        <td colspan="8" class="px-3 py-8 text-center text-gray-500">
-                          Nenhum registro ainda. Adicione seu primeiro dia acima!
-                        </td>
-                      </tr>
-                    ` : registros.map(r => {
-                      const lucro = parseValor(r.ganhos) - (parseValor(r.carregamento) + parseValor(r.manutencao) + parseValor(r.outros));
-                      return `
-                        <tr class="hover:bg-slate-50">
-                          <td class="px-3 py-2 font-medium">${fmtData(r.data)}</td>
-                          <td class="px-3 py-2 text-right text-green-600 font-semibold">${fmt(r.ganhos)}</td>
-                          <td class="px-3 py-2 text-right text-red-600">${fmt(r.carregamento)}</td>
-                          <td class="px-3 py-2 text-right text-red-600">${fmt(r.manutencao)}</td>
-                          <td class="px-3 py-2 text-right text-red-600">${fmt(r.outros)}</td>
-                          <td class="px-3 py-2 text-right font-bold ${lucro >= 0 ? 'text-blue-600' : 'text-red-600'}">
-                            ${fmt(lucro)}
-                          </td>
-                          <td class="px-3 py-2 text-gray-600">${r.obs || '-'}</td>
-                          <td class="px-3 py-2 text-center">
-                            <button onclick="remover(${r.id})" class="text-red-600 hover:text-red-800 text-lg">
-                              🗑️
-                            </button>
-                          </td>
-                        </tr>
-                      `;
-                    }).join('')}
+                    ${tabelaRegistros}
                   </tbody>
                 </table>
               </div>
@@ -347,7 +452,7 @@
                   <option value="Supermercado">🛒 Supermercado</option>
                   <option value="Farmácia">💊 Farmácia</option>
                   <option value="Restaurante">🍽️ Restaurante</option>
-                  <option value="Posto">⛽ Posto (Pessoal)</option>
+                  <option value="Posto">⚡ Posto (Pessoal)</option>
                   <option value="Roupas">👕 Roupas</option>
                   <option value="Lazer">🎮 Lazer</option>
                   <option value="Contas">📄 Contas</option>
@@ -377,25 +482,7 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-200">
-                    ${gastosPessoais.length === 0 ? `
-                      <tr>
-                        <td colspan="5" class="px-3 py-8 text-center text-gray-500">
-                          Nenhum gasto pessoal registrado ainda
-                        </td>
-                      </tr>
-                    ` : gastosPessoais.map(g => `
-                      <tr class="hover:bg-orange-50">
-                        <td class="px-3 py-2 font-medium">${fmtData(g.data)}</td>
-                        <td class="px-3 py-2">${g.local}</td>
-                        <td class="px-3 py-2 text-right text-orange-600 font-semibold">${fmt(g.valor)}</td>
-                        <td class="px-3 py-2 text-gray-600">${g.obs || '-'}</td>
-                        <td class="px-3 py-2 text-center">
-                          <button onclick="removerGasto(${g.id})" class="text-red-600 hover:text-red-800 text-lg">
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    `).join('')}
+                    ${tabelaGastos}
                   </tbody>
                 </table>
               </div>
@@ -412,7 +499,7 @@
                     <div class="text-3xl">📅</div>
                   </div>
                   <div class="text-4xl font-bold text-green-600 mb-2">
-                    ${fmt(lucroHoje)}
+                    ${formatarMoeda(lucroHoje)}
                   </div>
                   <div class="text-xs text-gray-500">Lucro líquido de hoje</div>
                 </div>
@@ -423,7 +510,7 @@
                     <div class="text-3xl">📆</div>
                   </div>
                   <div class="text-4xl font-bold text-blue-600 mb-2">
-                    ${fmt(lucroSemana)}
+                    ${formatarMoeda(lucroSemana)}
                   </div>
                   <div class="text-xs text-gray-500">${diasSemana} dias trabalhados</div>
                 </div>
@@ -434,54 +521,67 @@
                     <div class="text-3xl">📊</div>
                   </div>
                   <div class="text-4xl font-bold text-purple-600 mb-2">
-                    ${fmt(lucroMes)}
+                    ${formatarMoeda(lucroMes)}
                   </div>
                   <div class="text-xs text-gray-500">${diasMes} dias trabalhados</div>
                 </div>
               </div>
             </div>
 
-            <div class="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-300 rounded-xl p-4">
+            <div class="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-300 rounded-xl p-4 mb-6">
               <p class="text-sm text-gray-800">
                 <strong>💾 Salvamento automático:</strong> Seus dados são salvos no navegador automaticamente.<br/>
                 <strong>⚠️ IMPORTANTE:</strong> Faça backup regularmente usando o botão "💾 Backup" acima!
-                <strong> Dev by Gabriel!
+              </p>
+            </div>
+
+            <div class="text-center py-4">
+              <p class="text-gray-600 text-sm">
+                Desenvolvido por <span class="font-semibold text-green-600">Gabriel</span> ⚡
               </p>
             </div>
           </div>
         </div>
       `;
 
-      // Atualiza os event listeners dos inputs
-      document.getElementById('data').addEventListener('change', (e) => {
+      // Adiciona os eventos nos campos de entrada
+      document.getElementById('data').addEventListener('change', function(e) {
         novoRegistro.data = e.target.value;
       });
-      document.getElementById('ganhos').addEventListener('input', (e) => {
+      
+      document.getElementById('ganhos').addEventListener('input', function(e) {
         novoRegistro.ganhos = e.target.value;
       });
-      document.getElementById('carregamento').addEventListener('input', (e) => {
+      
+      document.getElementById('carregamento').addEventListener('input', function(e) {
         novoRegistro.carregamento = e.target.value;
       });
-      document.getElementById('manutencao').addEventListener('input', (e) => {
+      
+      document.getElementById('manutencao').addEventListener('input', function(e) {
         novoRegistro.manutencao = e.target.value;
       });
-      document.getElementById('outros').addEventListener('input', (e) => {
+      
+      document.getElementById('outros').addEventListener('input', function(e) {
         novoRegistro.outros = e.target.value;
       });
-      document.getElementById('obs').addEventListener('input', (e) => {
+      
+      document.getElementById('obs').addEventListener('input', function(e) {
         novoRegistro.obs = e.target.value;
       });
 
-      document.getElementById('gastoData').addEventListener('change', (e) => {
+      document.getElementById('gastoData').addEventListener('change', function(e) {
         novoGasto.data = e.target.value;
       });
-      document.getElementById('gastoLocal').addEventListener('change', (e) => {
+      
+      document.getElementById('gastoLocal').addEventListener('change', function(e) {
         novoGasto.local = e.target.value;
       });
-      document.getElementById('gastoValor').addEventListener('input', (e) => {
+      
+      document.getElementById('gastoValor').addEventListener('input', function(e) {
         novoGasto.valor = e.target.value;
       });
-      document.getElementById('gastoObs').addEventListener('input', (e) => {
+      
+      document.getElementById('gastoObs').addEventListener('input', function(e) {
         novoGasto.obs = e.target.value;
       });
     }
