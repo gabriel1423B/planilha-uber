@@ -39,7 +39,7 @@
     let gastosPessoais = [];
     let novoRegistro = {
       data: new Date().toISOString().split('T')[0],
-      ganhos: '', combustivel: '', manutencao: '', outros: '', obs: ''
+      ganhos: '', Carregamento: '', manutencao: '', outros: '', obs: ''
     };
     let novoGasto = {
       data: new Date().toISOString().split('T')[0],
@@ -75,17 +75,17 @@
 
     function calcularStats() {
       const totalGanhos = registros.reduce((s, r) => s + parseValor(r.ganhos), 0);
-      const totalCombustivel = registros.reduce((s, r) => s + parseValor(r.combustivel), 0);
+      const totalCarregamento = registros.reduce((s, r) => s + parseValor(r.Carregamento), 0);
       const totalManutencao = registros.reduce((s, r) => s + parseValor(r.manutencao), 0);
       const totalOutros = registros.reduce((s, r) => s + parseValor(r.outros), 0);
-      const totalGastos = totalCombustivel + totalManutencao + totalOutros;
+      const totalGastos = totalCarregamento + totalManutencao + totalOutros;
       const lucroLiquido = totalGanhos - totalGastos;
       const dias = registros.length;
       const totalGastosPessoais = gastosPessoais.reduce((s, g) => s + parseValor(g.valor), 0);
       const saldoFinal = lucroLiquido - totalGastosPessoais;
       
       return {
-        totalGanhos, totalCombustivel, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
+        totalGanhos, totalCarregamento, totalManutencao, totalOutros, totalGastos, lucroLiquido, dias,
         totalGastosPessoais, saldoFinal,
         mediaGanhos: dias > 0 ? totalGanhos / dias : 0,
         mediaLucro: dias > 0 ? lucroLiquido / dias : 0
@@ -101,14 +101,14 @@
         id: Date.now(),
         data: novoRegistro.data,
         ganhos: parseFloat(novoRegistro.ganhos) || 0,
-        combustivel: parseFloat(novoRegistro.combustivel) || 0,
+        Carregamento: parseFloat(novoRegistro.Carregamento) || 0,
         manutencao: parseFloat(novoRegistro.manutencao) || 0,
         outros: parseFloat(novoRegistro.outros) || 0,
         obs: novoRegistro.obs
       };
       registros.push(reg);
       registros.sort((a, b) => new Date(b.data) - new Date(a.data));
-      novoRegistro = { data: new Date().toISOString().split('T')[0], ganhos: '', combustivel: '', manutencao: '', outros: '', obs: '' };
+      novoRegistro = { data: new Date().toISOString().split('T')[0], ganhos: '', Carregamento: '', manutencao: '', outros: '', obs: '' };
       salvarDados();
       render();
     }
@@ -196,11 +196,11 @@
       
       const lucroHoje = registros
         .filter(r => r.data === hoje)
-        .reduce((s, r) => s + (r.ganhos - r.combustivel - r.manutencao - r.outros), 0);
+        .reduce((s, r) => s + (r.ganhos - r.Carregamento - r.manutencao - r.outros), 0);
       
       const lucroSemana = registros
         .filter(r => new Date(r.data + 'T00:00') >= inicioSemana)
-        .reduce((s, r) => s + (r.ganhos - r.combustivel - r.manutencao - r.outros), 0);
+        .reduce((s, r) => s + (r.ganhos - r.Carregamento - r.manutencao - r.outros), 0);
       
       const diasSemana = registros.filter(r => new Date(r.data + 'T00:00') >= inicioSemana).length;
       
@@ -210,7 +210,7 @@
           const h = new Date();
           return d.getMonth() === h.getMonth() && d.getFullYear() === h.getFullYear();
         })
-        .reduce((s, r) => s + (r.ganhos - r.combustivel - r.manutencao - r.outros), 0);
+        .reduce((s, r) => s + (r.ganhos - r.Carregamento - r.manutencao - r.outros), 0);
       
       const diasMes = registros.filter(r => {
         const d = new Date(r.data + 'T00:00');
@@ -251,7 +251,7 @@
               <div class="bg-white rounded-xl shadow-lg p-4 border-l-4 border-red-500">
                 <div class="text-gray-600 font-medium text-sm mb-1">Gastos Uber</div>
                 <p class="text-2xl font-bold text-gray-800">${fmt(stats.totalGastos)}</p>
-                <p class="text-xs text-gray-500 mt-1">Combustível: ${fmt(stats.totalCombustivel)}</p>
+                <p class="text-xs text-gray-500 mt-1">Combustível: ${fmt(stats.totalCarregamento)}</p>
               </div>
               <div class="bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500">
                 <div class="text-gray-600 font-medium text-sm mb-1">Lucro Uber</div>
@@ -277,7 +277,7 @@
               <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
                 <input type="date" id="data" value="${novoRegistro.data}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 <input type="number" step="0.01" placeholder="Ganhos" id="ganhos" value="${novoRegistro.ganhos}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                <input type="number" step="0.01" placeholder="Combustível" id="combustivel" value="${novoRegistro.combustivel}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <input type="number" step="0.01" placeholder="Combustível" id="Carregamento" value="${novoRegistro.Carregamento}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 <input type="number" step="0.01" placeholder="Manutenção" id="manutencao" value="${novoRegistro.manutencao}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 <input type="number" step="0.01" placeholder="Outros" id="outros" value="${novoRegistro.outros}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 <input type="text" placeholder="Obs" id="obs" value="${novoRegistro.obs}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
@@ -313,12 +313,12 @@
                         </td>
                       </tr>
                     ` : registros.map(r => {
-                      const lucro = r.ganhos - (r.combustivel + r.manutencao + r.outros);
+                      const lucro = r.ganhos - (r.Carregamento + r.manutencao + r.outros);
                       return `
                         <tr class="hover:bg-slate-50">
                           <td class="px-3 py-2 font-medium">${fmtData(r.data)}</td>
                           <td class="px-3 py-2 text-right text-green-600 font-semibold">${fmt(r.ganhos)}</td>
-                          <td class="px-3 py-2 text-right text-red-600">${fmt(r.combustivel)}</td>
+                          <td class="px-3 py-2 text-right text-red-600">${fmt(r.Carregamento)}</td>
                           <td class="px-3 py-2 text-right text-red-600">${fmt(r.manutencao)}</td>
                           <td class="px-3 py-2 text-right text-red-600">${fmt(r.outros)}</td>
                           <td class="px-3 py-2 text-right font-bold ${lucro >= 0 ? 'text-blue-600' : 'text-red-600'}">
@@ -458,8 +458,8 @@
       document.getElementById('ganhos').addEventListener('input', (e) => {
         novoRegistro.ganhos = e.target.value;
       });
-      document.getElementById('combustivel').addEventListener('input', (e) => {
-        novoRegistro.combustivel = e.target.value;
+      document.getElementById('Carregamento').addEventListener('input', (e) => {
+        novoRegistro.Carregamento = e.target.value;
       });
       document.getElementById('manutencao').addEventListener('input', (e) => {
         novoRegistro.manutencao = e.target.value;
