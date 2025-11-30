@@ -68,15 +68,20 @@
       setTimeout(() => indicador.classList.add('hidden'), 2000);
     }
 
+    function parseValor(val) {
+      const num = parseFloat(val);
+      return isNaN(num) ? 0 : num;
+    }
+
     function calcularStats() {
-      const totalGanhos = registros.reduce((s, r) => s + parseFloat(r.ganhos || 0), 0);
-      const totalCombustivel = registros.reduce((s, r) => s + parseFloat(r.combustivel || 0), 0);
-      const totalManutencao = registros.reduce((s, r) => s + parseFloat(r.manutencao || 0), 0);
-      const totalOutros = registros.reduce((s, r) => s + parseFloat(r.outros || 0), 0);
+      const totalGanhos = registros.reduce((s, r) => s + parseValor(r.ganhos), 0);
+      const totalCombustivel = registros.reduce((s, r) => s + parseValor(r.combustivel), 0);
+      const totalManutencao = registros.reduce((s, r) => s + parseValor(r.manutencao), 0);
+      const totalOutros = registros.reduce((s, r) => s + parseValor(r.outros), 0);
       const totalGastos = totalCombustivel + totalManutencao + totalOutros;
       const lucroLiquido = totalGanhos - totalGastos;
       const dias = registros.length;
-      const totalGastosPessoais = gastosPessoais.reduce((s, g) => s + parseFloat(g.valor || 0), 0);
+      const totalGastosPessoais = gastosPessoais.reduce((s, g) => s + parseValor(g.valor), 0);
       const saldoFinal = lucroLiquido - totalGastosPessoais;
       
       return {
